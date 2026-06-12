@@ -1,0 +1,2305 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>nETHer - Alquileres Transparentes en Blockchain</title>
+  <meta name="description"
+    content="Plataforma de gestión de alquileres y custodias de garantía sobre la red Ethereum Sepolia. Desarrollado para la cátedra de Blockchain.">
+
+  <!-- Google Fonts -->
+  <link
+    href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap"
+    rel="stylesheet">
+
+  <!-- Ethers.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.11.1/ethers.umd.min.js"></script>
+
+  <style>
+    :root {
+      /* Palette based on Blockchain, Security and Transparency */
+      --primary: #00f2fe;
+      --primary-hover: #4facfe;
+      --primary-glow: rgba(0, 242, 254, 0.15);
+      --secondary: #6366f1;
+      /* Tech Indigo */
+      --secondary-hover: #4f46e5;
+
+      --bg-base: #06080f;
+      /* Deep tech obsidian */
+      --bg-surface: #0b0f19;
+      /* Cool slate surface */
+      --bg-card: rgba(13, 19, 33, 0.7);
+      /* Glassmorphic card base */
+      --bg-card-hover: rgba(20, 28, 48, 0.85);
+
+      --text-bright: #ffffff;
+      --text-main: #e2e8f0;
+      --text-muted: #64748b;
+
+      --border: rgba(255, 255, 255, 0.06);
+      --border-hover: rgba(0, 242, 254, 0.25);
+
+      --success: #10b981;
+      /* Emerald green - security */
+      --success-bg: rgba(16, 185, 129, 0.08);
+      --warning: #f59e0b;
+      /* Amber - custody/pending */
+      --warning-bg: rgba(245, 158, 11, 0.08);
+      --danger: #f43f5e;
+      /* Rose - disputes */
+      --danger-bg: rgba(244, 63, 94, 0.08);
+      --info-bg: rgba(0, 242, 254, 0.06);
+
+      --radius: 8px;
+      --radius-lg: 14px;
+
+      --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      --font-title: 'Outfit', sans-serif;
+      --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      outline-color: var(--primary);
+    }
+
+    body {
+      font-family: var(--font-sans);
+      background-color: var(--bg-base);
+      color: var(--text-main);
+      margin: 0;
+      padding: 0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+    }
+
+    /* ── GEOMETRIC BACKGROUND ── */
+    .bg-geom-container {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      pointer-events: none;
+      z-index: -1;
+      overflow: hidden;
+      background-color: var(--bg-base);
+      /* Transparent square tech grid pattern */
+      background-size: 50px 50px;
+      background-image:
+        linear-gradient(to right, rgba(255, 255, 255, 0.012) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255, 255, 255, 0.012) 1px, transparent 1px);
+    }
+
+    .geom-box {
+      position: absolute;
+      border: 1px solid rgba(255, 255, 255, 0.025);
+      background: rgba(255, 255, 255, 0.002);
+      border-radius: 4px;
+      backdrop-filter: blur(0.5px);
+    }
+
+    /* Geometric translucent boxes mapping to blocks */
+    .geom-1 {
+      top: 15%;
+      left: 8%;
+      width: 280px;
+      height: 160px;
+      border-color: rgba(0, 242, 254, 0.04);
+      background: rgba(0, 242, 254, 0.001);
+    }
+
+    .geom-2 {
+      top: 50%;
+      right: 10%;
+      width: 340px;
+      height: 220px;
+      border-color: rgba(99, 102, 241, 0.04);
+      background: rgba(99, 102, 241, 0.001);
+    }
+
+    .geom-3 {
+      bottom: 15%;
+      left: 18%;
+      width: 200px;
+      height: 200px;
+      border-color: rgba(255, 255, 255, 0.02);
+    }
+
+    .geom-4 {
+      top: 28%;
+      left: 55%;
+      width: 150px;
+      height: 300px;
+      border-color: rgba(0, 242, 254, 0.025);
+    }
+
+    /* ── NAVBAR (Sticky Top) ── */
+    .navbar {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      background: rgba(6, 8, 15, 0.8);
+      border-bottom: 1px solid var(--border);
+      transition: all 0.3s ease;
+    }
+
+    .navbar-container {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.75rem 1.5rem;
+      gap: 1.5rem;
+    }
+
+    .logo-group {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      text-decoration: none;
+      transition: opacity 0.2s ease;
+    }
+
+    .logo-group:hover {
+      opacity: 0.9;
+    }
+
+    .logo-icon {
+      width: 36px;
+      height: 36px;
+      background: linear-gradient(135deg, var(--primary), var(--secondary));
+      border-radius: var(--radius);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 15px rgba(0, 242, 254, 0.25);
+      color: white;
+    }
+
+    .logo-icon svg {
+      width: 20px;
+      height: 20px;
+      fill: currentColor;
+    }
+
+    .logo-text {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .logo-text h1 {
+      font-family: var(--font-title);
+      font-size: 1.25rem;
+      font-weight: 800;
+      line-height: 1;
+      margin: 0;
+      color: var(--text-bright);
+      letter-spacing: -0.5px;
+    }
+
+    .logo-text h1 span {
+      background: linear-gradient(90deg, var(--primary), var(--primary-hover));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .logo-subtitle {
+      font-size: 0.65rem;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      margin-top: 2px;
+    }
+
+    /* ── NAV MENU (TABS) ── */
+    .nav-menu {
+      display: flex;
+      align-items: center;
+      gap: 0.25rem;
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid var(--border);
+      padding: 4px 10px;
+      border-radius: 30px;
+      overflow-x: auto;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(0, 242, 254, 0.15) transparent;
+      -webkit-overflow-scrolling: touch;
+      flex-shrink: 1;
+      max-width: 100%;
+    }
+
+    .nav-menu::-webkit-scrollbar {
+      height: 3px;
+      display: block;
+    }
+
+    .nav-menu::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    .nav-menu::-webkit-scrollbar-thumb {
+      background: rgba(0, 242, 254, 0.15);
+      border-radius: 10px;
+    }
+
+    .nav-menu::-webkit-scrollbar-thumb:hover {
+      background: rgba(0, 242, 254, 0.35);
+    }
+
+    .tab-btn {
+      background: transparent;
+      border: none;
+      padding: 0.55rem 1rem;
+      font-family: var(--font-sans);
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      cursor: pointer;
+      border-radius: 20px;
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+      white-space: nowrap;
+    }
+
+    .tab-btn:hover {
+      color: var(--text-bright);
+      background: rgba(255, 255, 255, 0.04);
+    }
+
+    .tab-btn.active {
+      color: #06080f;
+      background: linear-gradient(135deg, var(--primary), var(--primary-hover));
+      font-weight: 700;
+      box-shadow: 0 4px 12px rgba(0, 242, 254, 0.2);
+    }
+
+    .navbar-right {
+      display: flex;
+      align-items: center;
+      gap: 0.85rem;
+    }
+
+    .network-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.4rem 0.75rem;
+      border-radius: 20px;
+      font-family: var(--font-sans);
+      font-size: 0.7rem;
+      font-weight: 700;
+      background: rgba(99, 102, 241, 0.06);
+      color: #818cf8;
+      border: 1px solid rgba(99, 102, 241, 0.15);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .network-badge .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--secondary);
+      box-shadow: 0 0 8px var(--secondary);
+      animation: pulse-dot-network 2s infinite;
+    }
+
+    @keyframes pulse-dot-network {
+
+      0%,
+      100% {
+        opacity: 1;
+        transform: scale(1);
+      }
+
+      50% {
+        opacity: 0.4;
+        transform: scale(0.9);
+      }
+    }
+
+    /* ── HERO BANNER ── */
+    .hero-banner {
+      max-width: 1200px;
+      margin: 2.5rem auto 1.5rem auto;
+      padding: 0 1.5rem;
+      text-align: center;
+    }
+
+    .hero-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      background: var(--info-bg);
+      border: 1px solid rgba(0, 242, 254, 0.15);
+      color: var(--primary);
+      font-family: var(--font-sans);
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 0.35rem 0.9rem;
+      border-radius: 30px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 1.25rem;
+      box-shadow: 0 2px 10px rgba(0, 242, 254, 0.04);
+    }
+
+    .hero-banner h2 {
+      font-family: var(--font-title);
+      font-size: 2.4rem;
+      font-weight: 800;
+      line-height: 1.15;
+      margin: 0 0 0.75rem 0;
+      color: var(--text-bright);
+      letter-spacing: -1px;
+    }
+
+    .hero-banner h2 span {
+      background: linear-gradient(135deg, var(--primary), var(--secondary));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .hero-banner p {
+      font-size: 1rem;
+      color: var(--text-muted);
+      max-width: 680px;
+      margin: 0 auto;
+      line-height: 1.6;
+    }
+
+    /* ── APP CONTAINER ── */
+    .app-container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 1.5rem;
+      flex: 1;
+      width: 100%;
+    }
+
+    /* ── TAB CONTENT / SECTIONS ── */
+    .tab-content {
+      display: none;
+    }
+
+    .tab-content.active {
+      display: block;
+      animation: sectionFadeIn 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+
+    @keyframes sectionFadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(12px);
+        filter: blur(2px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+        filter: blur(0);
+      }
+    }
+
+    /* ── SECTION HEADER ── */
+    .section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1.5rem;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 1.25rem;
+      gap: 1.25rem;
+      flex-wrap: wrap;
+    }
+
+    .section-header h2 {
+      font-family: var(--font-title);
+      font-size: 1.45rem;
+      font-weight: 700;
+      color: var(--text-bright);
+      margin: 0 0 0.25rem 0;
+      letter-spacing: -0.5px;
+    }
+
+    .section-subtitle {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin: 0;
+      font-weight: 400;
+    }
+
+    /* ── CARDS & FORMS ── */
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 2.25rem;
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      max-width: 460px;
+      margin: 0 auto;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, var(--primary), var(--secondary));
+    }
+
+    .card h2 {
+      margin: 0 0 0.5rem 0;
+      font-family: var(--font-title);
+      font-size: 1.35rem;
+      font-weight: 700;
+      color: var(--text-bright);
+    }
+
+    .card p.subtitle {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin: 0 0 1.75rem 0;
+      line-height: 1.5;
+    }
+
+    .form-group {
+      margin-bottom: 1.25rem;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .form-group label {
+      font-size: 0.72rem;
+      font-weight: 700;
+      margin-bottom: 0.45rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .form-group input,
+    .form-group select {
+      padding: 0.75rem 0.9rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      font-family: var(--font-sans);
+      font-size: 0.9rem;
+      background-color: rgba(0, 0, 0, 0.15);
+      color: var(--text-bright);
+      transition: all 0.25s ease;
+    }
+
+    .form-group input:focus,
+    .form-group select:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px var(--primary-glow);
+      background-color: rgba(255, 255, 255, 0.02);
+    }
+
+    .form-group input::placeholder {
+      color: var(--text-muted);
+      opacity: 0.5;
+    }
+
+    .input-readonly {
+      background-color: rgba(0, 0, 0, 0.3) !important;
+      color: var(--text-muted) !important;
+      cursor: not-allowed;
+      border-color: var(--border) !important;
+    }
+
+    /* ── BUTTONS ── */
+    .btn {
+      background: linear-gradient(135deg, var(--primary), var(--primary-hover));
+      color: #06080f;
+      border: none;
+      padding: 0.7rem 1.35rem;
+      border-radius: var(--radius);
+      font-family: var(--font-sans);
+      font-weight: 700;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+      letter-spacing: 0.02em;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.45rem;
+      box-shadow: 0 4px 12px rgba(0, 242, 254, 0.15);
+    }
+
+    .btn:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(0, 242, 254, 0.25);
+      filter: brightness(1.05);
+    }
+
+    .btn:active:not(:disabled) {
+      transform: translateY(0);
+    }
+
+    .btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+      box-shadow: none !important;
+      transform: none !important;
+    }
+
+    .btn-sm {
+      padding: 0.45rem 0.9rem;
+      font-size: 0.78rem;
+      border-radius: var(--radius);
+    }
+
+    .btn-success {
+      background: linear-gradient(135deg, var(--success), #059669);
+      color: white;
+      box-shadow: 0 4px 12px rgba(16, 185, 129, 0.15);
+    }
+
+    .btn-success:hover:not(:disabled) {
+      box-shadow: 0 6px 20px rgba(16, 185, 129, 0.3);
+    }
+
+    .btn-danger {
+      background: linear-gradient(135deg, var(--danger), #e11d48);
+      color: white;
+      box-shadow: 0 4px 12px rgba(244, 63, 94, 0.15);
+    }
+
+    .btn-danger:hover:not(:disabled) {
+      box-shadow: 0 6px 20px rgba(244, 63, 94, 0.3);
+    }
+
+    .btn-warning {
+      background: linear-gradient(135deg, var(--warning), #d97706);
+      color: #06080f;
+      box-shadow: 0 4px 12px rgba(245, 158, 11, 0.15);
+    }
+
+    .btn-warning:hover:not(:disabled) {
+      box-shadow: 0 6px 20px rgba(245, 158, 11, 0.3);
+    }
+
+    /* ── PROPERTIES GRID ── */
+    .properties-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 1.25rem;
+      margin-top: 1rem;
+    }
+
+    .property-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 1.35rem 1.5rem;
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      gap: 0.8rem;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    }
+
+    .property-card::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, var(--primary), var(--secondary));
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+
+    .property-card:hover {
+      transform: translateY(-4px);
+      border-color: var(--border-hover);
+      box-shadow: 0 10px 25px rgba(0, 242, 254, 0.08);
+      background: var(--bg-card-hover);
+    }
+
+    .property-card:hover::after {
+      opacity: 1;
+    }
+
+    .property-card h3 {
+      margin: 0;
+      font-family: var(--font-title);
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: var(--text-bright);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .property-card h3 .id-tag {
+      color: var(--primary);
+      font-family: var(--font-mono);
+      background: rgba(0, 242, 254, 0.06);
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.8rem;
+      border: 1px solid rgba(0, 242, 254, 0.12);
+    }
+
+    .property-detail {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.85rem;
+      border-bottom: 1px dashed rgba(255, 255, 255, 0.04);
+      padding-bottom: 0.45rem;
+    }
+
+    .property-detail:last-of-type {
+      border-bottom: none;
+    }
+
+    .property-detail .label {
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+
+    .property-detail .value {
+      color: var(--text-bright);
+      font-weight: 600;
+    }
+
+    .property-detail .value.eth {
+      color: var(--primary);
+      font-family: var(--font-mono);
+      font-size: 0.9rem;
+    }
+
+    .address-block {
+      display: flex;
+      flex-direction: column;
+      gap: 0.3rem;
+    }
+
+    .address-block .label {
+      font-size: 0.68rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      letter-spacing: 0.05em;
+    }
+
+    .property-address {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      word-break: break-all;
+      font-family: var(--font-mono);
+      padding: 0.55rem 0.7rem;
+      background: rgba(0, 0, 0, 0.2);
+      border: 1px solid rgba(255, 255, 255, 0.03);
+      border-radius: var(--radius);
+      transition: all 0.2s ease;
+    }
+
+    .property-card:hover .property-address {
+      color: var(--text-main);
+      background: rgba(0, 0, 0, 0.3);
+      border-color: rgba(255, 255, 255, 0.05);
+    }
+
+    .property-card .card-actions {
+      margin-top: 0.5rem;
+      padding-top: 0.75rem;
+      border-top: 1px solid var(--border);
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    .property-card .card-actions .btn {
+      flex: 1;
+      font-size: 0.78rem;
+      padding: 0.55rem 0.5rem;
+    }
+
+    /* ── BADGES ── */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      padding: 0.2rem 0.65rem;
+      border-radius: 20px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .badge .dot {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+    }
+
+    /* 0: Inexistente */
+    .badge-0 {
+      background-color: rgba(100, 116, 139, 0.08);
+      color: var(--text-muted);
+      border: 1px solid rgba(100, 116, 139, 0.15);
+    }
+
+    .badge-0 .dot {
+      background: var(--text-muted);
+    }
+
+    /* 1: Disponible (Green) */
+    .badge-1 {
+      background-color: rgba(16, 185, 129, 0.08);
+      color: #34d399;
+      border: 1px solid rgba(16, 185, 129, 0.2);
+    }
+
+    .badge-1 .dot {
+      background: var(--success);
+      box-shadow: 0 0 6px var(--success);
+      animation: pulse-dot 1.5s infinite;
+    }
+
+    /* 2: Reservada (Amber) */
+    .badge-2 {
+      background-color: rgba(245, 158, 11, 0.08);
+      color: #fbbf24;
+      border: 1px solid rgba(245, 158, 11, 0.2);
+    }
+
+    .badge-2 .dot {
+      background: var(--warning);
+      box-shadow: 0 0 6px var(--warning);
+      animation: pulse-dot 1.5s infinite;
+    }
+
+    /* 3: Finalizada (Gray) */
+    .badge-3 {
+      background-color: rgba(100, 116, 139, 0.08);
+      color: var(--text-muted);
+      border: 1px solid rgba(100, 116, 139, 0.15);
+    }
+
+    .badge-3 .dot {
+      background: var(--text-muted);
+    }
+
+    /* 4: EnDisputa (Rose Red) */
+    .badge-4 {
+      background-color: rgba(244, 63, 94, 0.08);
+      color: #f43f5e;
+      border: 1px solid rgba(244, 63, 94, 0.2);
+    }
+
+    .badge-4 .dot {
+      background: var(--danger);
+      box-shadow: 0 0 6px var(--danger);
+      animation: pulse-dot 1.5s infinite;
+    }
+
+    @keyframes pulse-dot {
+
+      0%,
+      100% {
+        transform: scale(0.95);
+        opacity: 0.7;
+      }
+
+      50% {
+        transform: scale(1.15);
+        opacity: 1;
+      }
+    }
+
+    /* ── STATUS BAR ── */
+    #status {
+      max-width: 1200px;
+      margin: 0 auto 1.5rem auto;
+      padding: 0.9rem 1.2rem;
+      border-radius: var(--radius);
+      text-align: left;
+      font-weight: 600;
+      font-size: 0.85rem;
+      display: none;
+      border: 1px solid transparent;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      animation: slideDown 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+
+    @keyframes slideDown {
+      from {
+        opacity: 0;
+        transform: translateY(-8px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .status-success {
+      background-color: var(--success-bg) !important;
+      color: #34d399 !important;
+      border-color: rgba(16, 185, 129, 0.2) !important;
+      display: flex !important;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .status-success::before {
+      content: '✓';
+      font-weight: 800;
+      font-size: 1rem;
+    }
+
+    .status-error {
+      background-color: var(--danger-bg) !important;
+      color: #fb7185 !important;
+      border-color: rgba(244, 63, 94, 0.2) !important;
+      display: flex !important;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .status-error::before {
+      content: '⚠';
+      font-weight: 800;
+      font-size: 1rem;
+    }
+
+    .status-info {
+      background-color: var(--info-bg) !important;
+      color: var(--primary-hover) !important;
+      border-color: rgba(0, 242, 254, 0.2) !important;
+      display: flex !important;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .status-info::before {
+      content: '⬡';
+      font-weight: 800;
+      font-size: 1rem;
+      animation: pulse-dot-network 1.5s infinite;
+    }
+
+    /* ── EMPTY STATE ── */
+    .empty-state {
+      grid-column: 1 / -1;
+      text-align: center;
+      padding: 3.5rem 2rem;
+      color: var(--text-muted);
+      background: rgba(255, 255, 255, 0.01);
+      border: 1px dashed var(--border);
+      border-radius: var(--radius-lg);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0.65rem;
+    }
+
+    .empty-state .icon {
+      font-size: 2.8rem;
+      line-height: 1;
+      background: linear-gradient(135deg, var(--primary), var(--secondary));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      opacity: 0.7;
+      filter: drop-shadow(0 4px 10px rgba(0, 242, 254, 0.15));
+      margin-bottom: 0.25rem;
+    }
+
+    .empty-state p {
+      margin: 0;
+      font-size: 0.9rem;
+      max-width: 320px;
+      line-height: 1.5;
+    }
+
+    /* ── INFO BAR ── */
+    .info-bar {
+      display: flex;
+      align-items: center;
+      gap: 0.85rem;
+      margin-bottom: 1.25rem;
+      padding: 0.85rem 1.15rem;
+      background: rgba(0, 242, 254, 0.04);
+      border: 1px solid rgba(0, 242, 254, 0.12);
+      border-radius: var(--radius);
+      font-size: 0.85rem;
+      color: var(--text-main);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+    }
+
+    .info-bar .count {
+      font-family: var(--font-title);
+      font-weight: 800;
+      font-size: 1.6rem;
+      color: var(--primary);
+      line-height: 1;
+      text-shadow: 0 0 8px rgba(0, 242, 254, 0.2);
+    }
+
+    .info-bar.warning {
+      background: rgba(245, 158, 11, 0.04);
+      border-color: rgba(245, 158, 11, 0.15);
+    }
+
+    .info-bar.warning .count {
+      color: var(--warning);
+      text-shadow: 0 0 8px rgba(245, 158, 11, 0.2);
+    }
+
+    .info-bar.danger {
+      background: rgba(244, 63, 94, 0.04);
+      border-color: rgba(244, 63, 94, 0.15);
+    }
+
+    .info-bar.danger .count {
+      color: var(--danger);
+      text-shadow: 0 0 8px rgba(244, 63, 94, 0.2);
+    }
+
+    /* ── CUSTODY INFO / RECEIPT ── */
+    .custody-info {
+      margin-top: 0.5rem;
+      padding: 0.85rem 1.1rem;
+      background: rgba(0, 0, 0, 0.25);
+      border: 1px solid rgba(255, 255, 255, 0.03);
+      border-radius: var(--radius);
+      font-size: 0.8rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.55rem;
+    }
+
+    .custody-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px dashed rgba(255, 255, 255, 0.04);
+      padding-bottom: 0.45rem;
+    }
+
+    .custody-row:last-child {
+      border-bottom: none;
+      padding-bottom: 0;
+      margin-top: 0.15rem;
+    }
+
+    .custody-label {
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+
+    .custody-value {
+      color: var(--text-bright);
+      font-weight: 600;
+    }
+
+    .custody-value.liquidado {
+      color: var(--success);
+    }
+
+    .custody-value.pendiente {
+      color: var(--warning);
+    }
+
+    /* ── ADMIN PANEL & SECTIONS ── */
+    .admin-section {
+      border: 1px solid rgba(245, 158, 11, 0.15);
+      background: rgba(245, 158, 11, 0.02);
+      border-radius: var(--radius-lg);
+      padding: 1.5rem;
+      margin-top: 1.25rem;
+      position: relative;
+    }
+
+    .admin-section::before {
+      content: 'ADMINISTRADOR';
+      position: absolute;
+      top: 0;
+      right: 1.25rem;
+      transform: translateY(-50%);
+      background: #d97706;
+      color: #06080f;
+      font-size: 0.58rem;
+      font-weight: 800;
+      padding: 0.18rem 0.45rem;
+      border-radius: 4px;
+      letter-spacing: 0.05em;
+    }
+
+    .admin-section h3 {
+      margin: 0 0 0.4rem 0;
+      font-family: var(--font-title);
+      font-size: 1rem;
+      color: var(--warning);
+      font-weight: 700;
+    }
+
+    .admin-section p.subtitle {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      margin: 0 0 1.15rem 0;
+      line-height: 1.5;
+    }
+
+    /* ── RADIO GROUP ── */
+    .radio-group {
+      display: flex;
+      gap: 0.75rem;
+      margin-bottom: 1.25rem;
+    }
+
+    .radio-option {
+      flex: 1;
+      position: relative;
+    }
+
+    .radio-option input[type="radio"] {
+      position: absolute;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .radio-option label {
+      display: block;
+      padding: 0.75rem;
+      text-align: center;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      background: rgba(255, 255, 255, 0.01);
+    }
+
+    .radio-option label:hover {
+      border-color: rgba(255, 255, 255, 0.1);
+      color: var(--text-main);
+    }
+
+    .radio-option input[type="radio"]:checked+label {
+      border-color: var(--primary);
+      background: var(--info-bg);
+      color: var(--primary);
+      box-shadow: 0 0 10px rgba(0, 242, 254, 0.08);
+    }
+
+    /* ── FOOTER ACADÉMICO ── */
+    .footer {
+      margin-top: auto;
+      border-top: 1px solid var(--border);
+      background: rgba(6, 8, 15, 0.6);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      padding: 1.75rem 1.5rem;
+    }
+
+    .footer-content {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+
+    .footer-team {
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      margin: 0;
+    }
+
+    .footer-team strong {
+      color: var(--text-main);
+      font-weight: 600;
+    }
+
+    .footer-uni {
+      font-size: 0.78rem;
+      font-weight: 500;
+      color: var(--text-muted);
+      opacity: 0.75;
+      margin: 0;
+      letter-spacing: 0.02em;
+    }
+
+    /* ── CUSTOM SCROLLBAR ── */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: var(--bg-base);
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 3px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(0, 242, 254, 0.2);
+    }
+
+    /* ── RESPONSIVE / MEDIA QUERIES ── */
+    @media (max-width: 1024px) {
+      .navbar-container {
+        flex-direction: column;
+        align-items: stretch;
+        padding: 0.9rem 1.25rem;
+        gap: 1rem;
+      }
+
+      .logo-group {
+        justify-content: center;
+      }
+
+      .nav-menu {
+        justify-content: flex-start;
+        padding: 4px 6px;
+      }
+
+      .navbar-right {
+        justify-content: space-between;
+      }
+
+      .hero-banner {
+        margin: 2rem auto 1rem auto;
+      }
+
+      .hero-banner h2 {
+        font-size: 2rem;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .app-container {
+        padding: 1rem;
+      }
+
+      .card {
+        padding: 1.75rem 1.5rem;
+      }
+
+      .radio-group {
+        flex-direction: column;
+        gap: 0.5rem;
+      }
+
+      .footer-content {
+        flex-direction: column;
+        text-align: center;
+        gap: 0.5rem;
+      }
+    }
+
+    .owner-layout {
+      display: grid;
+      grid-template-columns: 380px 1fr;
+      gap: 2rem;
+      align-items: start;
+    }
+
+    .owner-sidebar {
+      position: sticky;
+      top: 100px;
+    }
+
+    .owner-main {
+      flex: 1;
+      min-width: 0;
+    }
+
+    @media (max-width: 1024px) {
+      .owner-layout {
+        grid-template-columns: 1fr;
+        gap: 1.5rem;
+      }
+
+      .owner-sidebar {
+        position: static;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- ── GEOMETRIC BACKGROUND ── -->
+  <div class="bg-geom-container">
+    <div class="geom-box geom-1"></div>
+    <div class="geom-box geom-2"></div>
+    <div class="geom-box geom-3"></div>
+    <div class="geom-box geom-4"></div>
+  </div>
+
+  <!-- ── NAVBAR ── -->
+  <nav class="navbar">
+    <div class="navbar-container">
+      <a href="#" class="logo-group">
+        <div class="logo-icon">
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M9 9V15M15 9V15M9 9H15M9 9L5 5M15 9L19 5M9 15L5 19M15 15L19 19" stroke="currentColor"
+              stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+            <rect x="3" y="3" width="4" height="4" rx="1" fill="currentColor" />
+            <rect x="17" y="3" width="4" height="4" rx="1" fill="currentColor" />
+            <rect x="3" y="17" width="4" height="4" rx="1" fill="currentColor" />
+            <rect x="17" y="17" width="4" height="4" rx="1" fill="currentColor" />
+          </svg>
+        </div>
+        <div class="logo-text">
+          <h1>nETHer <span>Blockchain</span></h1>
+          <span class="logo-subtitle">Cátedra UTN</span>
+        </div>
+      </a>
+
+      <div class="nav-menu">
+        <button class="tab-btn active" onclick="openTab('explorar', this)">🔍 Explorar</button>
+        <button class="tab-btn" onclick="openTab('misInmuebles', this)">🏷️ Mis Inmuebles</button>
+        <button class="tab-btn" onclick="openTab('reservasActivas', this)">📅 Reservas</button>
+        <button class="tab-btn" onclick="openTab('alquilar', this)">🔑 Reservar</button>
+        <button class="tab-btn" onclick="openTab('checkout', this)">✅ Check-Out</button>
+        <button class="tab-btn" onclick="openTab('disputas', this)">⚖️ Disputas</button>
+        <button id="tabAdmin" class="tab-btn" onclick="openTab('admin', this)" style="display:none;">⚙️ Admin</button>
+      </div>
+
+      <div class="navbar-right">
+        <div class="network-badge"><span class="dot"></span> Sepolia</div>
+        <button id="btnConnect" class="btn btn-sm">⬡ Conectar Wallet</button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ── HERO BANNER ── -->
+  <header class="hero-banner">
+    <div class="hero-tag">
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style="margin-right:2px; vertical-align: middle;">
+        <circle cx="6" cy="6" r="5" stroke="currentColor" stroke-width="1.5" />
+        <path d="M6 3V6.5L8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+      </svg>
+      Garantía & Transparencia Descentralizada
+    </div>
+    <h2>Garantizando la <span>Transparencia</span> en Alquileres</h2>
+    <p>Plataforma para la gestión segura de contratos de alquiler y depósitos de garantía sobre la red Ethereum Sepolia,
+      eliminando intermediarios y resolviendo disputas de forma transparente.</p>
+  </header>
+
+  <main class="app-container">
+
+    <!-- Status message bar -->
+    <div id="status"></div>
+
+    <!-- ── TAB: EXPLORAR ── -->
+    <section id="explorar" class="tab-content active">
+      <div class="section-header">
+        <div>
+          <h2>Inmuebles en la Red</h2>
+          <p class="section-subtitle">Visualizá los inmuebles y estados de reserva registrados on-chain.</p>
+        </div>
+        <button onclick="cargarPropiedades()" class="btn btn-sm">↻ Refrescar</button>
+      </div>
+      <div id="propertiesGrid" class="properties-grid">
+        <div class="empty-state">
+          <div class="icon">⬡</div>
+          <p>Conectá tu billetera para explorar las propiedades.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── TAB: MIS INMUEBLES ── -->
+    <section id="misInmuebles" class="tab-content">
+      <div class="section-header">
+        <div>
+          <h2>Mis Inmuebles & Alta</h2>
+          <p class="section-subtitle">Administrá tus inmuebles registrados y da de alta nuevas propiedades on-chain.</p>
+        </div>
+        <button onclick="cargarMisInmuebles()" class="btn btn-sm">↻ Refrescar</button>
+      </div>
+
+      <div class="owner-layout">
+        <div class="owner-sidebar">
+          <div class="card" style="margin: 0; max-width: 100%;">
+            <h2>Alta de Inmueble</h2>
+            <p class="subtitle">Registrá un nuevo inmueble en la blockchain. Quedará vinculado a tu dirección pública.
+            </p>
+            <div class="form-group">
+              <label for="regOwner">Tu Dirección (Propietario)</label>
+              <input type="text" id="regOwner" class="input-readonly" readonly
+                placeholder="Conectá MetaMask para cargar tu cuenta">
+            </div>
+            <div class="form-group">
+              <label for="regId">ID Único del Inmueble</label>
+              <input type="number" id="regId" placeholder="Ej: 101">
+            </div>
+            <div class="form-group">
+              <label for="regPrice">Precio Base (ETH por estadía)</label>
+              <input type="number" step="0.0001" id="regPrice" placeholder="Ej: 0.05">
+            </div>
+            <button id="btnRegistrar" class="btn" style="width: 100%; margin-top: 0.5rem;">Registrar On-Chain</button>
+          </div>
+        </div>
+
+        <div class="owner-main">
+          <div id="myPropsInfo" class="info-bar" style="display: none;">
+            <span class="count" id="myPropsCount">0</span>
+            <span>propiedades registradas a tu nombre</span>
+          </div>
+          <div id="myPropertiesGrid" class="properties-grid">
+            <div class="empty-state">
+              <div class="icon">🏷️</div>
+              <p>Conectá tu billetera para ver tus inmuebles propios.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── TAB: RESERVAS ACTIVAS ── -->
+    <section id="reservasActivas" class="tab-content">
+      <div class="section-header">
+        <div>
+          <h2>Reservas Activas</h2>
+          <p class="section-subtitle">Custodias de fondos y reservas vigentes en la red.</p>
+        </div>
+        <button onclick="cargarReservasActivas()" class="btn btn-sm">↻ Refrescar</button>
+      </div>
+      <div id="reservasInfo" class="info-bar warning" style="display: none;">
+        <span class="count" id="reservasCount">0</span>
+        <span>reservas actualmente bloqueadas en custodia</span>
+      </div>
+      <div id="reservasGrid" class="properties-grid">
+        <div class="empty-state">
+          <div class="icon">📅</div>
+          <p>Conectá tu billetera para ver las reservas activas.</p>
+        </div>
+      </div>
+    </section>
+
+
+    <!-- ── TAB: ALQUILAR (RESERVAR) ── -->
+    <section id="alquilar" class="tab-content">
+      <div class="card">
+        <h2>Reservar Estadía</h2>
+        <p class="subtitle">Elegí un inmueble de la lista. El contrato retendrá un 5% de fianza extra para la bóveda.
+        </p>
+        <div class="form-group">
+          <label for="rentId">Inmueble a Reservar</label>
+          <select id="rentId">
+            <option value="">Conectá tu wallet para ver disponibles...</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="rentBasePrice">Tarifa Publicada (ETH)</label>
+          <input type="number" step="0.0001" id="rentBasePrice" class="input-readonly" readonly
+            placeholder="Se autocompleta al elegir">
+        </div>
+        <button id="btnAlquilar" class="btn btn-success" style="width: 100%; margin-top: 0.5rem;">Pagar y Bloquear
+          Fondos</button>
+      </div>
+    </section>
+
+    <!-- ── TAB: CHECKOUT ── -->
+    <section id="checkout" class="tab-content">
+      <div class="card">
+        <h2>Confirmar Check-Out</h2>
+        <p class="subtitle">Seleccioná una reserva activa. Solo el inquilino puede finalizar el contrato, liberando
+          fondos y recuperando fianza.</p>
+        <div class="form-group">
+          <label for="checkoutSelect">Tus Reservas Activas</label>
+          <select id="checkoutSelect">
+            <option value="">Conectá tu wallet para ver tus reservas...</option>
+          </select>
+        </div>
+        <div id="checkoutDetail" style="display: none; margin-bottom: 1.25rem;">
+          <div class="custody-info">
+            <div class="custody-row">
+              <span class="custody-label">ID Inmueble</span>
+              <span class="custody-value" id="coId">—</span>
+            </div>
+            <div class="custody-row">
+              <span class="custody-label">Propietario</span>
+              <span class="custody-value" id="coPropietario"
+                style="font-size: 0.68rem; font-family: var(--font-mono);">—</span>
+            </div>
+            <div class="custody-row">
+              <span class="custody-label">Monto en Custodia</span>
+              <span class="custody-value" id="coMonto" style="color: var(--primary);">—</span>
+            </div>
+            <div class="custody-row">
+              <span class="custody-label">Alquiler → Propietario</span>
+              <span class="custody-value" id="coAlquiler">—</span>
+            </div>
+            <div class="custody-row">
+              <span class="custody-label">Fianza → Devolución</span>
+              <span class="custody-value" id="coFianza" style="color: var(--success);">—</span>
+            </div>
+          </div>
+        </div>
+        <button id="btnCheckout" class="btn" style="width: 100%; margin-top: 0.5rem;">Finalizar Estadía</button>
+      </div>
+    </section>
+
+    <!-- ── TAB: DISPUTAS ── -->
+    <section id="disputas" class="tab-content">
+      <!-- Abrir Disputa (Inquilino) -->
+      <div class="card" style="margin-bottom: 2rem;">
+        <h2>⚖️ Abrir Disputa</h2>
+        <p class="subtitle">Congelá los fondos en custodia en caso de incumplimientos. Solo el inquilino puede iniciar
+          esta acción.</p>
+        <div class="form-group">
+          <label for="disputaSelect">Tus Reservas Activas</label>
+          <select id="disputaSelect">
+            <option value="">Conectá tu wallet para ver tus reservas...</option>
+          </select>
+        </div>
+        <button id="btnAbrirDisputa" class="btn btn-danger" style="width: 100%; margin-top: 0.5rem;">Abrir Disputa
+          On-Chain</button>
+      </div>
+
+      <!-- Resolver Disputa (Solo Admin) -->
+      <div id="adminDisputas" class="admin-section" style="display: none;">
+        <h3>🔒 Panel de Resolución (Administrador)</h3>
+        <p class="subtitle">Como administrador, resolvé disputas activas decidiendo el reembolso al inquilino o el pago
+          al propietario.</p>
+        <div class="form-group">
+          <label for="resolverDisputaSelect">Disputas Activas</label>
+          <select id="resolverDisputaSelect">
+            <option value="">Cargando disputas...</option>
+          </select>
+        </div>
+        <div class="radio-group">
+          <div class="radio-option">
+            <input type="radio" id="resolucionInquilino" name="resolucion" value="inquilino" checked>
+            <label for="resolucionInquilino">💰 Reembolsar Inquilino</label>
+          </div>
+          <div class="radio-option">
+            <input type="radio" id="resolucionPropietario" name="resolucion" value="propietario">
+            <label for="resolucionPropietario">🏠 Pagar Propietario</label>
+          </div>
+        </div>
+        <button id="btnResolverDisputa" class="btn btn-warning" style="width: 100%;">Ejecutar Resolución</button>
+      </div>
+    </section>
+
+    <!-- ── TAB: ADMIN ── -->
+    <section id="admin" class="tab-content">
+      <div class="card">
+        <h2>⚙️ Administración</h2>
+        <p class="subtitle">Configuraciones del administrador de GestionReservas.</p>
+
+        <div class="admin-section" style="margin-top: 0; border: none; background: none; padding: 0;">
+          <h3>Configurar Bóveda</h3>
+          <p class="subtitle" style="margin-bottom:1rem;">Vinculá la dirección de GarantiaContrato como custodia.</p>
+          <div class="form-group">
+            <label for="bovedaAddr">Dirección de GarantiaContrato</label>
+            <input type="text" id="bovedaAddr" placeholder="0x...">
+          </div>
+          <div class="form-group">
+            <label>Bóveda Actual</label>
+            <input type="text" id="bovedaActual" class="input-readonly" readonly placeholder="No consultada aún">
+          </div>
+          <button id="btnSetBoveda" class="btn btn-warning" style="width: 100%;">Configurar Bóveda</button>
+        </div>
+
+        <div style="margin-top: 1.5rem; padding-top: 1.25rem; border-top: 1px solid var(--border);">
+          <div class="form-group">
+            <label>Administrador del Contrato</label>
+            <input type="text" id="adminAddr" class="input-readonly" readonly placeholder="No consultado aún">
+          </div>
+          <div class="form-group">
+            <label>Total de Reservas Realizadas</label>
+            <input type="text" id="contadorReservas" class="input-readonly" readonly placeholder="—">
+          </div>
+          <button onclick="cargarInfoAdmin()" class="btn btn-sm" style="width: 100%;">↻ Refrescar Info</button>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ── FOOTER ACADÉMICO ── -->
+  <footer class="footer">
+    <div class="footer-content">
+      <p class="footer-team">Desarrollado por: <strong>Beccereca, Martín</strong> y <strong>De Miguel, Alejo
+          José</strong></p>
+      <p class="footer-uni">Cátedra de Blockchain — Universidad Tecnológica Nacional</p>
+    </div>
+  </footer>
+
+  <script>
+    /** ═══════════════════════════════════════════════════
+     *  LÓGICA WEB3 Y GESTIÓN DEL DOM
+     *  ═══════════════════════════════════════════════════ */
+
+    function openTab(tabName, btn) {
+      document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.getElementById(tabName).classList.add('active');
+      btn.classList.add('active');
+    }
+
+    // ── CONTRATO: GestionReservas ──
+    const CONTRACT_ADDRESS = "0xd8f9d28eeb3d8829a67527e98becdc80becda2bb";
+    const CONTRACT_ABI = [
+      // Funciones de escritura
+      "function registrarInmueble(uint256 _idInmueble, address payable _propietario, uint256 _precio) external",
+      "function alquilar(uint256 _idInmueble) external payable",
+      "function confirmarCheckOut(uint256 _idInmueble) external",
+      "function abrirDisputa(uint256 _idInmueble) external",
+      "function resolverDisputa(uint256 _idInmueble, bool _devolverAlInquilino) external",
+      "function setBoveda(address _boveda) external",
+      // Funciones de lectura
+      "function historialReservas(uint256) view returns (address propietario, address inquilino, uint256 precioPorNoche, uint8 estado)",
+      "function administrador() view returns (address)",
+      "function bovedaGarantia() view returns (address)",
+      "function contadorReservas() view returns (uint256)",
+      // Eventos
+      "event InmuebleRegistrado(uint256 indexed idReserva, address indexed propietario, uint256 precio)",
+      "event EstadiaReservada(uint256 indexed idReserva, address indexed inquilino, uint256 montoTotal)",
+      "event EstadiaFinalizada(uint256 indexed idReserva)",
+      "event DisputaAbierta(uint256 indexed idReserva)",
+      "event DisputaResuelta(uint256 indexed idReserva, string resolucion)"
+    ];
+
+    // ── CONTRATO: GarantiaContrato (Bóveda) ──
+    const BOVEDA_ABI = [
+      "function mapaCustodias(uint256) view returns (address propietario, address inquilino, uint256 montoTotal, bool liquidado)",
+      "function contratoComercial() view returns (address)"
+    ];
+
+    let provider;
+    let signer;
+    let contract;
+    let bovedaContract;
+    let currentAccount = "";
+    let adminAddress = "";
+
+    // Cache de propiedades
+    let allProperties = [];
+
+    const statusEl = document.getElementById('status');
+    const btnConnect = document.getElementById('btnConnect');
+    const regOwnerInput = document.getElementById('regOwner');
+    const rentSelect = document.getElementById('rentId');
+    const rentBasePriceInput = document.getElementById('rentBasePrice');
+
+    // ── STATUS HELPER ──
+    function showStatus(message, type) {
+      statusEl.className = `status-${type}`;
+      statusEl.innerText = message;
+      setTimeout(() => { statusEl.className = ''; statusEl.innerText = ''; }, 7000);
+    }
+
+    // ── WALLET CONNECT ──
+    const SESSION_KEY = 'nether_session';
+
+    function saveSession(account) {
+      localStorage.setItem(SESSION_KEY, JSON.stringify({ account, timestamp: Date.now() }));
+    }
+
+    function clearSession() {
+      localStorage.removeItem(SESSION_KEY);
+    }
+
+    function getSavedSession() {
+      try {
+        const raw = localStorage.getItem(SESSION_KEY);
+        if (!raw) return null;
+        return JSON.parse(raw);
+      } catch { return null; }
+    }
+
+    async function setupAccount(account) {
+      currentAccount = account;
+      btnConnect.innerText = `⬡ ${account.substring(0, 6)}…${account.substring(38)}`;
+      btnConnect.style.background = "linear-gradient(135deg, var(--success), #059669)";
+      btnConnect.style.color = "white";
+      regOwnerInput.value = account;
+
+      // Persistir sesión
+      saveSession(account);
+
+      // Detectar si es admin
+      try {
+        adminAddress = await contract.administrador();
+        if (adminAddress.toLowerCase() === currentAccount.toLowerCase()) {
+          document.getElementById('tabAdmin').style.display = '';
+          document.getElementById('adminDisputas').style.display = '';
+        } else {
+          document.getElementById('tabAdmin').style.display = 'none';
+          document.getElementById('adminDisputas').style.display = 'none';
+        }
+      } catch (e) { console.warn("No se pudo leer administrador:", e); }
+
+      // Intentar conectar bóveda
+      try {
+        const bovedaAddr = await contract.bovedaGarantia();
+        if (bovedaAddr && bovedaAddr !== ethers.ZeroAddress) {
+          bovedaContract = new ethers.Contract(bovedaAddr, BOVEDA_ABI, provider);
+        }
+      } catch (e) { console.warn("No se pudo leer bovedaGarantia:", e); }
+
+      cargarPropiedades();
+    }
+
+    btnConnect.addEventListener('click', async () => {
+      if (window.ethereum == null) return showStatus("MetaMask no está instalado.", "error");
+
+      try {
+        provider = new ethers.BrowserProvider(window.ethereum);
+        const accounts = await provider.send("eth_requestAccounts", []);
+        signer = await provider.getSigner();
+        contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
+
+        await setupAccount(accounts[0]);
+        showStatus("Billetera conectada exitosamente.", "success");
+
+        window.ethereum.on('accountsChanged', async (newAccounts) => {
+          if (newAccounts.length > 0) {
+            signer = await provider.getSigner();
+            contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
+            await setupAccount(newAccounts[0]);
+          } else {
+            // El usuario desconectó todas las cuentas
+            clearSession();
+            currentAccount = '';
+            btnConnect.innerText = '⬡ Conectar Wallet';
+            btnConnect.style.background = '';
+            btnConnect.style.color = '';
+          }
+        });
+
+      } catch (error) {
+        console.error(error);
+        showStatus("Error al conectar la billetera.", "error");
+      }
+    });
+
+    // ══════════════════════════════════════════════════════
+    //  HELPERS DE RENDERIZADO
+    // ══════════════════════════════════════════════════════
+
+    const ESTADOS = ["Inexistente", "Disponible", "Reservada", "Finalizada", "EnDisputa"];
+
+    function crearPropertyCardHTML(prop, opciones = {}) {
+      const { mostrarAcciones = false, tipo = '' } = opciones;
+
+      let accionesHTML = '';
+      if (mostrarAcciones && tipo === 'reserva') {
+        accionesHTML = `
+          <div class="card-actions">
+            <button class="btn btn-sm" onclick="ejecutarCheckout('${prop.id}')">✅ Check-Out</button>
+            <button class="btn btn-sm btn-danger" onclick="ejecutarAbrirDisputa('${prop.id}')">⚖️ Disputar</button>
+          </div>`;
+      }
+
+      let custodiaHTML = '';
+      if (prop.custodia) {
+        const c = prop.custodia;
+        custodiaHTML = `
+          <div class="custody-info">
+            <div class="custody-row">
+              <span class="custody-label">Custodia</span>
+              <span class="custody-value ${c.liquidado ? 'liquidado' : 'pendiente'}">${c.liquidado ? '✓ Liquidado' : '⏳ En custodia'}</span>
+            </div>
+            <div class="custody-row">
+              <span class="custody-label">Monto Total</span>
+              <span class="custody-value" style="color: var(--primary);">${c.montoEth} ETH</span>
+            </div>
+          </div>`;
+      }
+
+      return `
+        <div class="property-card">
+          <h3><span class="id-tag">#${prop.id}</span></h3>
+          <div class="property-detail">
+            <span class="label">Precio Base</span>
+            <span class="value eth">${prop.precioEth} ETH</span>
+          </div>
+          <div class="property-detail">
+            <span class="label">Estado</span>
+            <span><span class="badge badge-${prop.estadoNumerico}"><span class="dot"></span> ${prop.estadoTexto}</span></span>
+          </div>
+          ${prop.inquilino && prop.inquilino !== ethers.ZeroAddress ? `
+          <div class="address-block">
+            <span class="label">Inquilino</span>
+            <div class="property-address">${prop.inquilino}</div>
+          </div>
+          ` : ''}
+          <div class="address-block">
+            <span class="label">Propietario</span>
+            <div class="property-address">${prop.propietario}</div>
+          </div>
+          ${custodiaHTML}
+          ${accionesHTML}
+        </div>
+      `;
+    }
+
+    // ══════════════════════════════════════════════════════
+    //  CARGAR PROPIEDADES (principal)
+    // ══════════════════════════════════════════════════════
+
+    async function cargarPropiedades() {
+      if (!contract) return;
+      const grid = document.getElementById('propertiesGrid');
+      grid.innerHTML = '<div class="empty-state"><div class="icon">⏳</div><p>Consultando la blockchain...</p></div>';
+
+      // Reiniciamos combos
+      rentSelect.innerHTML = '<option value="">Seleccioná un inmueble disponible...</option>';
+      rentBasePriceInput.value = '';
+      allProperties = [];
+
+      try {
+        const filter = contract.filters.InmuebleRegistrado();
+        const events = await contract.queryFilter(filter);
+
+        if (events.length === 0) {
+          grid.innerHTML = '<div class="empty-state"><div class="icon">📭</div><p>No hay inmuebles registrados aún.</p></div>';
+          rentSelect.innerHTML = '<option value="">No hay inmuebles en la red</option>';
+          actualizarTodosLosPaneles();
+          return;
+        }
+
+        grid.innerHTML = '';
+        let hayDisponibles = false;
+
+        for (let i = events.length - 1; i >= 0; i--) {
+          const idReserva = events[i].args[0];
+          const reservaActual = await contract.historialReservas(idReserva);
+
+          const precioEth = ethers.formatEther(reservaActual[2]);
+          const estadoNumerico = Number(reservaActual[3]);
+          const estadoTexto = ESTADOS[estadoNumerico];
+          const propietario = reservaActual[0];
+          const inquilino = reservaActual[1];
+
+          // Intentar leer custodia si la bóveda está configurada
+          let custodia = null;
+          if (bovedaContract && (estadoNumerico === 2 || estadoNumerico === 3 || estadoNumerico === 4)) {
+            try {
+              const cust = await bovedaContract.mapaCustodias(idReserva);
+              custodia = {
+                montoEth: ethers.formatEther(cust[2]),
+                liquidado: cust[3]
+              };
+            } catch (e) { /* Puede no tener custodia */ }
+          }
+
+          const prop = { id: idReserva.toString(), precioEth, propietario, inquilino, estadoNumerico, estadoTexto, custodia };
+          allProperties.push(prop);
+
+          grid.innerHTML += crearPropertyCardHTML(prop);
+
+          if (estadoNumerico === 1) {
+            hayDisponibles = true;
+            rentSelect.innerHTML += `<option value="${idReserva.toString()}" data-precio="${precioEth}">ID: ${idReserva.toString()} — ${precioEth} ETH</option>`;
+          }
+        }
+
+        if (!hayDisponibles) {
+          rentSelect.innerHTML = '<option value="">Ningún inmueble disponible actualmente</option>';
+        }
+
+        actualizarTodosLosPaneles();
+
+      } catch (error) {
+        console.error(error);
+        grid.innerHTML = '<div class="empty-state"><div class="icon">⚠️</div><p>Error al cargar las propiedades.</p></div>';
+      }
+    }
+
+    // ══════════════════════════════════════════════════════
+    //  ACTUALIZAR PANELES SECUNDARIOS
+    // ══════════════════════════════════════════════════════
+
+    function actualizarTodosLosPaneles() {
+      renderMisInmuebles();
+      renderReservasActivas();
+      renderCheckoutSelect();
+      renderDisputaSelects();
+    }
+
+    // ── MIS INMUEBLES ──
+    function renderMisInmuebles() {
+      const grid = document.getElementById('myPropertiesGrid');
+      const infoBar = document.getElementById('myPropsInfo');
+      const countEl = document.getElementById('myPropsCount');
+
+      if (!currentAccount) {
+        grid.innerHTML = '<div class="empty-state"><div class="icon">🏷️</div><p>Conectá tu billetera para ver tus inmuebles propios.</p></div>';
+        infoBar.style.display = 'none';
+        return;
+      }
+
+      const misProps = allProperties.filter(p =>
+        p.propietario.toLowerCase() === currentAccount.toLowerCase()
+      );
+
+      if (misProps.length === 0) {
+        grid.innerHTML = '<div class="empty-state"><div class="icon">📭</div><p>No tenés inmuebles registrados con esta cuenta.</p></div>';
+        infoBar.style.display = 'none';
+        return;
+      }
+
+      countEl.textContent = misProps.length;
+      infoBar.style.display = 'flex';
+      grid.innerHTML = '';
+      misProps.forEach(p => { grid.innerHTML += crearPropertyCardHTML(p); });
+    }
+
+    function cargarMisInmuebles() {
+      if (!contract) return showStatus("Conectá MetaMask primero.", "error");
+      allProperties.length === 0 ? cargarPropiedades() : renderMisInmuebles();
+    }
+
+    // ── RESERVAS ACTIVAS ──
+    function renderReservasActivas() {
+      const grid = document.getElementById('reservasGrid');
+      const infoBar = document.getElementById('reservasInfo');
+      const countEl = document.getElementById('reservasCount');
+
+      if (!currentAccount) {
+        grid.innerHTML = '<div class="empty-state"><div class="icon">📅</div><p>Conectá tu billetera para ver las reservas activas.</p></div>';
+        infoBar.style.display = 'none';
+        return;
+      }
+
+      // Reservas activas = estado Reservada (2) o EnDisputa (4)
+      const reservas = allProperties.filter(p => p.estadoNumerico === 2 || p.estadoNumerico === 4);
+
+      if (reservas.length === 0) {
+        grid.innerHTML = '<div class="empty-state"><div class="icon">✨</div><p>No hay reservas activas en este momento.</p></div>';
+        infoBar.style.display = 'none';
+        return;
+      }
+
+      countEl.textContent = reservas.length;
+      infoBar.style.display = 'flex';
+      grid.innerHTML = '';
+      reservas.forEach(p => {
+        // Si el inquilino soy yo, mostrar acciones
+        const esMiReserva = p.inquilino && p.inquilino.toLowerCase() === currentAccount.toLowerCase();
+        grid.innerHTML += crearPropertyCardHTML(p, { mostrarAcciones: esMiReserva && p.estadoNumerico === 2, tipo: 'reserva' });
+      });
+    }
+
+    // ── RESERVAS ACTIVAS REFRESH ──
+    function cargarReservasActivas() {
+      if (!contract) return showStatus("Conectá MetaMask primero.", "error");
+      allProperties.length === 0 ? cargarPropiedades() : renderReservasActivas();
+    }
+
+    // ── CHECKOUT SELECT ──
+    function renderCheckoutSelect() {
+      const sel = document.getElementById('checkoutSelect');
+      const detailDiv = document.getElementById('checkoutDetail');
+      detailDiv.style.display = 'none';
+
+      if (!currentAccount) {
+        sel.innerHTML = '<option value="">Conectá tu wallet para ver tus reservas...</option>';
+        return;
+      }
+
+      // Mis reservas activas (soy el inquilino y estado = Reservada)
+      const misReservas = allProperties.filter(p =>
+        p.inquilino &&
+        p.inquilino.toLowerCase() === currentAccount.toLowerCase() &&
+        p.estadoNumerico === 2
+      );
+
+      if (misReservas.length === 0) {
+        sel.innerHTML = '<option value="">No tenés reservas activas para check-out</option>';
+        return;
+      }
+
+      sel.innerHTML = '<option value="">Seleccioná una reserva...</option>';
+      misReservas.forEach(p => {
+        const custText = p.custodia ? ` — ${p.custodia.montoEth} ETH en custodia` : '';
+        sel.innerHTML += `<option value="${p.id}" data-prop="${encodeURIComponent(JSON.stringify(p))}">ID #${p.id} — ${p.precioEth} ETH${custText}</option>`;
+      });
+    }
+
+    document.getElementById('checkoutSelect').addEventListener('change', (e) => {
+      const detailDiv = document.getElementById('checkoutDetail');
+      const opt = e.target.options[e.target.selectedIndex];
+      const data = opt.getAttribute('data-prop');
+
+      if (!data) {
+        detailDiv.style.display = 'none';
+        return;
+      }
+
+      const p = JSON.parse(decodeURIComponent(data));
+      document.getElementById('coId').textContent = `#${p.id}`;
+      document.getElementById('coPropietario').textContent = p.propietario;
+
+      if (p.custodia) {
+        const montoTotal = parseFloat(p.custodia.montoEth);
+        const alquiler = (montoTotal * 100) / 105;
+        const fianza = montoTotal - alquiler;
+        document.getElementById('coMonto').textContent = `${p.custodia.montoEth} ETH`;
+        document.getElementById('coAlquiler').textContent = `${alquiler.toFixed(6)} ETH`;
+        document.getElementById('coFianza').textContent = `${fianza.toFixed(6)} ETH`;
+      } else {
+        document.getElementById('coMonto').textContent = `${p.precioEth} ETH (estimado)`;
+        document.getElementById('coAlquiler').textContent = '—';
+        document.getElementById('coFianza').textContent = '—';
+      }
+
+      detailDiv.style.display = 'block';
+    });
+
+    // ── DISPUTA SELECTS ──
+    function renderDisputaSelects() {
+      const selAbrir = document.getElementById('disputaSelect');
+      const selResolver = document.getElementById('resolverDisputaSelect');
+
+      if (!currentAccount) {
+        selAbrir.innerHTML = '<option value="">Conectá tu wallet para ver tus reservas...</option>';
+        selResolver.innerHTML = '<option value="">Conectá tu wallet...</option>';
+        return;
+      }
+
+      // Abrir disputa: mis reservas con estado Reservada
+      const misReservasAbrir = allProperties.filter(p =>
+        p.inquilino &&
+        p.inquilino.toLowerCase() === currentAccount.toLowerCase() &&
+        p.estadoNumerico === 2
+      );
+
+      if (misReservasAbrir.length === 0) {
+        selAbrir.innerHTML = '<option value="">No tenés reservas activas para disputar</option>';
+      } else {
+        selAbrir.innerHTML = '<option value="">Seleccioná una reserva...</option>';
+        misReservasAbrir.forEach(p => {
+          selAbrir.innerHTML += `<option value="${p.id}">ID #${p.id} — ${p.precioEth} ETH</option>`;
+        });
+      }
+
+      // Resolver disputa (admin): todas las que están EnDisputa
+      const enDisputa = allProperties.filter(p => p.estadoNumerico === 4);
+      if (enDisputa.length === 0) {
+        selResolver.innerHTML = '<option value="">No hay disputas activas</option>';
+      } else {
+        selResolver.innerHTML = '<option value="">Seleccioná una disputa...</option>';
+        enDisputa.forEach(p => {
+          selResolver.innerHTML += `<option value="${p.id}">ID #${p.id} — Inquilino: ${p.inquilino.substring(0, 10)}…</option>`;
+        });
+      }
+    }
+
+    // ══════════════════════════════════════════════════════
+    //  TRANSACCIONES
+    // ══════════════════════════════════════════════════════
+
+    // Autocompletar precio al elegir inmueble
+    rentSelect.addEventListener('change', (e) => {
+      const selectedOption = e.target.options[e.target.selectedIndex];
+      const precio = selectedOption.getAttribute('data-precio');
+      rentBasePriceInput.value = precio || '';
+    });
+
+    // ── REGISTRAR ──
+    document.getElementById('btnRegistrar').addEventListener('click', async () => {
+      if (!contract) return showStatus("Conectá MetaMask primero.", "error");
+      const id = document.getElementById('regId').value;
+      const priceEth = document.getElementById('regPrice').value;
+
+      if (!id || !priceEth) return showStatus("Completá ID y Precio.", "error");
+
+      try {
+        showStatus("Aprobá la transacción en MetaMask...", "info");
+
+        const precioLimpio = priceEth.toString().replace(',', '.');
+        const priceWei = ethers.parseEther(precioLimpio);
+        const idBigInt = BigInt(id);
+
+        const tx = await contract.registrarInmueble(idBigInt, currentAccount, priceWei);
+        showStatus("Transacción enviada. Esperando confirmación de Sepolia (~15 seg)...", "info");
+        await tx.wait();
+        showStatus(`¡Inmueble ${id} registrado exitosamente!`, "success");
+
+        document.getElementById('regId').value = '';
+        document.getElementById('regPrice').value = '';
+        cargarPropiedades();
+      } catch (error) {
+        console.error("Detalle técnico del error:", error);
+        if (error.code === 'ACTION_REJECTED') {
+          showStatus("Rechazaste la transacción en MetaMask.", "error");
+        } else {
+          showStatus("Falló. Probablemente el ID ya existe en la red. Probá con otro ID.", "error");
+        }
+      }
+    });
+
+    // ── ALQUILAR ──
+    document.getElementById('btnAlquilar').addEventListener('click', async () => {
+      if (!contract) return showStatus("Conectá MetaMask primero.", "error");
+
+      const id = rentSelect.value;
+      const basePriceEth = rentBasePriceInput.value;
+
+      if (!id || !basePriceEth) return showStatus("Seleccioná un inmueble válido de la lista.", "error");
+
+      try {
+        showStatus("Firmando... (Se añadirá 5% de fianza)", "info");
+        const basePriceWei = ethers.parseEther(basePriceEth.toString());
+        const fianzaRequerida = (basePriceWei * 5n) / 100n;
+        const costoTotalWei = basePriceWei + fianzaRequerida;
+
+        const tx = await contract.alquilar(id, { value: costoTotalWei });
+        showStatus("Procesando pago y bloqueo en custodia...", "info");
+        await tx.wait();
+
+        showStatus("¡Reserva confirmada!", "success");
+        rentBasePriceInput.value = '';
+        cargarPropiedades();
+      } catch (error) {
+        console.error(error);
+        if (error.code === 'ACTION_REJECTED') {
+          showStatus("Rechazaste la transacción en MetaMask.", "error");
+        } else {
+          showStatus("Falló la reserva. Revisá tu saldo de SepoliaETH o si la bóveda está configurada.", "error");
+        }
+      }
+    });
+
+    // ── CHECKOUT ──
+    document.getElementById('btnCheckout').addEventListener('click', async () => {
+      const id = document.getElementById('checkoutSelect').value;
+      if (!contract) return showStatus("Conectá MetaMask primero.", "error");
+      if (!id) return showStatus("Seleccioná una reserva para hacer check-out.", "error");
+
+      try {
+        showStatus("Iniciando check-out y liberación de fondos...", "info");
+        const tx = await contract.confirmarCheckOut(id);
+        showStatus("Esperando confirmación de la red...", "info");
+        await tx.wait();
+
+        showStatus(`¡Check-out del inmueble #${id} exitoso! Garantía devuelta.`, "success");
+        cargarPropiedades();
+      } catch (error) {
+        console.error(error);
+        if (error.code === 'ACTION_REJECTED') {
+          showStatus("Rechazaste la transacción en MetaMask.", "error");
+        } else {
+          showStatus("Error en check-out. Solo el inquilino original puede ejecutar esto.", "error");
+        }
+      }
+    });
+
+    // Checkout directo desde card
+    async function ejecutarCheckout(id) {
+      if (!contract) return showStatus("Conectá MetaMask primero.", "error");
+      try {
+        showStatus(`Iniciando check-out del inmueble #${id}...`, "info");
+        const tx = await contract.confirmarCheckOut(id);
+        showStatus("Esperando confirmación de la red...", "info");
+        await tx.wait();
+        showStatus(`¡Check-out #${id} exitoso! Garantía devuelta.`, "success");
+        cargarPropiedades();
+      } catch (error) {
+        console.error(error);
+        if (error.code === 'ACTION_REJECTED') {
+          showStatus("Rechazaste la transacción.", "error");
+        } else {
+          showStatus("Error en check-out. Verificá que seas el inquilino.", "error");
+        }
+      }
+    }
+
+    // ── ABRIR DISPUTA ──
+    document.getElementById('btnAbrirDisputa').addEventListener('click', async () => {
+      const id = document.getElementById('disputaSelect').value;
+      if (!contract) return showStatus("Conectá MetaMask primero.", "error");
+      if (!id) return showStatus("Seleccioná una reserva para disputar.", "error");
+
+      try {
+        showStatus(`Abriendo disputa para inmueble #${id}...`, "info");
+        const tx = await contract.abrirDisputa(id);
+        showStatus("Esperando confirmación de la red...", "info");
+        await tx.wait();
+        showStatus(`¡Disputa abierta para #${id}! Los fondos quedaron congelados.`, "success");
+        cargarPropiedades();
+      } catch (error) {
+        console.error(error);
+        if (error.code === 'ACTION_REJECTED') {
+          showStatus("Rechazaste la transacción.", "error");
+        } else {
+          showStatus("Error al abrir disputa. Verificá que seas el inquilino y el estado sea Reservada.", "error");
+        }
+      }
+    });
+
+    // Abrir disputa directo desde card
+    async function ejecutarAbrirDisputa(id) {
+      if (!contract) return showStatus("Conectá MetaMask primero.", "error");
+      try {
+        showStatus(`Abriendo disputa para inmueble #${id}...`, "info");
+        const tx = await contract.abrirDisputa(id);
+        showStatus("Esperando confirmación de la red...", "info");
+        await tx.wait();
+        showStatus(`¡Disputa abierta para #${id}!`, "success");
+        cargarPropiedades();
+      } catch (error) {
+        console.error(error);
+        if (error.code === 'ACTION_REJECTED') {
+          showStatus("Rechazaste la transacción.", "error");
+        } else {
+          showStatus("Error al abrir disputa.", "error");
+        }
+      }
+    }
+
+    // ── RESOLVER DISPUTA (ADMIN) ──
+    document.getElementById('btnResolverDisputa').addEventListener('click', async () => {
+      const id = document.getElementById('resolverDisputaSelect').value;
+      if (!contract) return showStatus("Conectá MetaMask primero.", "error");
+      if (!id) return showStatus("Seleccioná una disputa activa.", "error");
+
+      const devolverAlInquilino = document.getElementById('resolucionInquilino').checked;
+
+      try {
+        const accion = devolverAlInquilino ? "reembolso al inquilino" : "pago al propietario";
+        showStatus(`Resolviendo disputa #${id} con ${accion}...`, "info");
+        const tx = await contract.resolverDisputa(id, devolverAlInquilino);
+        showStatus("Esperando confirmación de la red...", "info");
+        await tx.wait();
+        showStatus(`¡Disputa #${id} resuelta! Acción: ${accion}.`, "success");
+        cargarPropiedades();
+      } catch (error) {
+        console.error(error);
+        if (error.code === 'ACTION_REJECTED') {
+          showStatus("Rechazaste la transacción.", "error");
+        } else {
+          showStatus("Error al resolver disputa. Verificá que seas el administrador.", "error");
+        }
+      }
+    });
+
+    // ── SET BÓVEDA (ADMIN) ──
+    document.getElementById('btnSetBoveda').addEventListener('click', async () => {
+      if (!contract) return showStatus("Conectá MetaMask primero.", "error");
+      const addr = document.getElementById('bovedaAddr').value.trim();
+      if (!addr) return showStatus("Ingresá la dirección del contrato GarantiaContrato.", "error");
+
+      try {
+        showStatus("Configurando bóveda...", "info");
+        const tx = await contract.setBoveda(addr);
+        showStatus("Esperando confirmación de la red...", "info");
+        await tx.wait();
+        showStatus("¡Bóveda configurada exitosamente!", "success");
+        document.getElementById('bovedaAddr').value = '';
+
+        // Reconectar bóveda
+        bovedaContract = new ethers.Contract(addr, BOVEDA_ABI, provider);
+        cargarInfoAdmin();
+      } catch (error) {
+        console.error(error);
+        if (error.code === 'ACTION_REJECTED') {
+          showStatus("Rechazaste la transacción.", "error");
+        } else {
+          showStatus("Error. Solo el administrador puede configurar la bóveda.", "error");
+        }
+      }
+    });
+
+    // ── INFO ADMIN ──
+    async function cargarInfoAdmin() {
+      if (!contract) return;
+      try {
+        const admin = await contract.administrador();
+        document.getElementById('adminAddr').value = admin;
+
+        const boveda = await contract.bovedaGarantia();
+        document.getElementById('bovedaActual').value = boveda === ethers.ZeroAddress ? 'No configurada' : boveda;
+
+        const contador = await contract.contadorReservas();
+        document.getElementById('contadorReservas').value = contador.toString();
+      } catch (e) {
+        console.warn("Error leyendo info admin:", e);
+      }
+    }
+
+    // ══════════════════════════════════════════════════════
+    //  AUTO-RECONEXIÓN DESDE LOCALSTORAGE
+    // ══════════════════════════════════════════════════════
+    (async function autoReconnect() {
+      const session = getSavedSession();
+      if (!session || !window.ethereum) return;
+
+      try {
+        // eth_accounts no abre popup, solo chequea permisos ya otorgados
+        provider = new ethers.BrowserProvider(window.ethereum);
+        const accounts = await provider.send('eth_accounts', []);
+
+        if (accounts.length === 0) {
+          clearSession();
+          return;
+        }
+
+        signer = await provider.getSigner();
+        contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
+        await setupAccount(accounts[0]);
+        showStatus('Sesión restaurada automáticamente.', 'success');
+
+        window.ethereum.on('accountsChanged', async (newAccounts) => {
+          if (newAccounts.length > 0) {
+            signer = await provider.getSigner();
+            contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
+            await setupAccount(newAccounts[0]);
+          } else {
+            clearSession();
+            currentAccount = '';
+            btnConnect.innerText = '⬡ Conectar Wallet';
+            btnConnect.style.background = '';
+            btnConnect.style.color = '';
+          }
+        });
+      } catch (e) {
+        console.warn('Auto-reconnect falló:', e);
+        clearSession();
+      }
+    })();
+  </script>
+</body>
+
+</html>
